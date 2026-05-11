@@ -151,8 +151,8 @@ jobs:
 
           workspace="$GITHUB_WORKSPACE"
           cd "$RUNNER_TEMP"
-          rm -rf "$workspace" \
-            "$RUNNER_TEMP/adoo-runner-logs" \
+          find "$workspace" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          rm -rf "$RUNNER_TEMP/adoo-runner-logs" \
             "$RUNNER_TEMP/adoo-runner-input.json"
 
   run:
@@ -222,6 +222,6 @@ jobs:
 
           workspace="$GITHUB_WORKSPACE"
           cd "$RUNNER_TEMP"
-          rm -rf "$workspace" \
-            "$RUNNER_TEMP/adoo-runner-logs" \
+          find "$workspace" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          rm -rf "$RUNNER_TEMP/adoo-runner-logs" \
             "$RUNNER_TEMP/adoo-runner-input.json"
