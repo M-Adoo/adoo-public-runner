@@ -19,9 +19,11 @@ build logs.
 - `request_id`: caller-generated run identifier
 
 The workflow validates the repository and script path, checks out the private
-repository with `persist-credentials: false`, injects `GH_TOKEN` only for the
-trusted script process, redirects stdout/stderr to runner-local temporary files,
-and removes the workspace and temporary logs in an `always()` cleanup step.
+repository with `persist-credentials: false`, runs the trusted script once in a
+`verify` phase, then runs the matrix in a `build` phase. `GH_TOKEN` is injected
+only for the build phase that uploads release assets. stdout/stderr are
+redirected to runner-local temporary files, and the workspace and temporary logs
+are removed in an `always()` cleanup step.
 
 The private release script is responsible for deleting the workflow run after it
 has verified the private release assets.

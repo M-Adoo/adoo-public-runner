@@ -90,8 +90,73 @@ jobs:
 
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
-  run:
+  verify:
     needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout private repository
+        uses: actions/checkout@v5
+        with:
+          repository: M-Adoo/${{ inputs.repo }}
+          ref: ${{ inputs.ref }}
+          token: ${{ secrets.ADOO_PRIVATE_REPO_PAT }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Validate trusted script file
+        env:
+          INPUT_SCRIPT: ${{ inputs.script }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          fail() {
+            echo "::error::$*"
+            exit 1
+          }
+
+          [[ -f "$INPUT_SCRIPT" ]] || fail "trusted script is not a regular file"
+          [[ ! -L "$INPUT_SCRIPT" ]] || fail "trusted script must not be a symlink"
+
+      - name: Write script input
+        env:
+          INPUT_PAYLOAD: ${{ inputs.input }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          input_file="$RUNNER_TEMP/adoo-runner-input.json"
+          printf '%s' "$INPUT_PAYLOAD" > "$input_file"
+          jq -e . "$input_file" >/dev/null
+          echo "ADOO_RUNNER_INPUT=$input_file" >> "$GITHUB_ENV"
+
+      - name: Execute trusted script verify phase
+        env:
+          ADOO_RUNNER_PHASE: verify
+          ADOO_RUNNER_REQUEST_ID: ${{ inputs.request_id }}
+          INPUT_SCRIPT: ${{ inputs.script }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          log_dir="$RUNNER_TEMP/adoo-runner-logs"
+          mkdir -p "$log_dir"
+          bash "$INPUT_SCRIPT" >"$log_dir/stdout.log" 2>"$log_dir/stderr.log"
+
+      - name: Cleanup private workspace and logs
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          workspace="$GITHUB_WORKSPACE"
+          cd "$RUNNER_TEMP"
+          rm -rf "$workspace" \
+            "$RUNNER_TEMP/adoo-runner-logs" \
+            "$RUNNER_TEMP/adoo-runner-input.json"
+
+  run:
+    needs: [validate, verify]
     strategy:
       fail-fast: false
       matrix:
@@ -99,7 +164,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout private repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: M-Adoo/${{ inputs.repo }}
           ref: ${{ inputs.ref }}
@@ -137,6 +202,7 @@ jobs:
       - name: Execute trusted script
         env:
           GH_TOKEN: ${{ secrets.ADOO_PRIVATE_REPO_PAT }}
+          ADOO_RUNNER_PHASE: build
           ADOO_RUNNER_MATRIX: ${{ toJson(matrix) }}
           ADOO_RUNNER_REQUEST_ID: ${{ inputs.request_id }}
           INPUT_SCRIPT: ${{ inputs.script }}
