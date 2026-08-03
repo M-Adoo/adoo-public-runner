@@ -3,9 +3,10 @@
 Public GitHub-hosted runner shell for trusted release scripts stored in private
 `M-Adoo/*` repositories.
 
-This repository intentionally contains only the workflow wrapper. It does not
-store private source snapshots, build outputs, release assets, artifacts, or
-build logs.
+This repository intentionally contains only the workflow wrapper. Private
+source snapshots and build logs remain runner-local. Matrix outputs are retained
+as workflow artifacts for one day at most and are deleted with the workflow run
+after the private release is verified.
 
 ## Workflow Contract
 
@@ -20,10 +21,17 @@ build logs.
 
 The workflow validates the repository and script path, checks out the private
 repository with `persist-credentials: false`, runs the trusted script once in a
-`verify` phase, then runs the matrix in a `build` phase. `GH_TOKEN` is injected
-only for the build phase that uploads release assets. stdout/stderr are
-redirected to runner-local temporary files, and the workspace and temporary logs
-are removed in an `always()` cleanup step.
+`verify` phase, then runs the matrix in a `build` phase. Each build writes files
+to `ADOO_RUNNER_OUTPUT`; the workflow uploads those directories as one-day
+artifacts. A single `finalize` job downloads and merges the outputs, installs
+Nix, checks out the complete private repository history with push credentials,
+and runs the same trusted script with `ADOO_RUNNER_PHASE=finalize`.
+
+The private PAT is not exposed to matrix build scripts. `GH_TOKEN` is injected
+only for the finalizer that publishes release assets, branches, and tags.
+stdout/stderr are redirected to runner-local temporary files, and each job
+removes its workspace, outputs, and temporary logs in an `always()` cleanup
+step.
 
 The private release script is responsible for deleting the workflow run after it
-has verified the private release assets.
+has verified the published Release and Nix refs.
